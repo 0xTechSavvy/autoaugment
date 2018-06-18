@@ -193,11 +193,10 @@ class Child:
 mem_softmaxes = []
 mem_accuracies = []
 
+controller = Controller()
+
 for epoch in range(CONTROLLER_EPOCHS):
     print('Controller: Epoch %d / %d' % (epoch+1, CONTROLLER_EPOCHS))
-    if epoch <= 10:
-        # during warmup, use random controllers
-        controller = Controller()
 
     softmaxes, subpolicies = controller.predict(SUBPOLICIES)
     for i, subpolicy in enumerate(subpolicies):
@@ -213,8 +212,8 @@ for epoch in range(CONTROLLER_EPOCHS):
     print('-> Child accuracy: %.3f (elaspsed time: %ds)' % (accuracy, (toc-tic)))
     mem_accuracies.append(accuracy)
 
-    if epoch >= 10:
-        # after warmup, start training the controller
+    if len(mem_softmaxes) > 5:
+        # ricardo: I let some epochs pass, so that the normalization is more robust
         controller.fit(mem_softmaxes, mem_accuracies)
     print()
 
