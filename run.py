@@ -103,6 +103,11 @@ class Controller:
         self.optimizer = tf.train.GradientDescentOptimizer(0.00035).apply_gradients(self.grads)
 
     def create_model(self):
+        # Implementation note: Keras requires an input. I create an input and then feed
+        # zeros to the network. Ugly, but it's the same as disabling those weights.
+        # Furthermore, Keras LSTM input=output, so we cannot produce more than SUBPOLICIES
+        # outputs. This is not desirable, since the paper produces 25 subpolicies in the
+        # end.
         input_layer = layers.Input(shape=(SUBPOLICIES, 1))
         init = initializers.RandomUniform(-0.1, 0.1)
         lstm_layer = layers.LSTM(
@@ -123,7 +128,6 @@ class Controller:
         min_acc = np.min(mem_accuracies)
         max_acc = np.max(mem_accuracies)
         dummy_input = np.zeros((1, SUBPOLICIES, 1))
-        dummy_input[0, 0, 0] = 1
         dict_input = {self.model.input: dummy_input}
         # FIXME: the paper does mini-batches (10)
         for softmaxes, acc in zip(mem_softmaxes, mem_accuracies):
@@ -135,7 +139,6 @@ class Controller:
 
     def predict(self, size):
         dummy_input = np.zeros((1, size, 1), np.float32)
-        dummy_input[0, 0, 0] = 1
         softmaxes = self.model.predict(dummy_input)
         # convert softmaxes into subpolicies
         subpolicies = []
