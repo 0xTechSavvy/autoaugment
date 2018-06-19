@@ -9,7 +9,6 @@ from transformations import get_transformations
 import PIL.Image
 import numpy as np
 import time
-import pickle
 
 # datasets in the AutoAugment paper:
 # CIFAR-10, CIFAR-100, SVHN, and ImageNet
@@ -18,10 +17,8 @@ import pickle
 def get_dataset(dataset, reduced):
     if dataset == 'cifar10':
         (Xtr, ytr), (Xts, yts) = datasets.cifar10.load_data()
-    elif dataset == 'reduced-cifar10':
-        (Xtr, ytr), (Xts, yts) = datasets.cifar10.load_data()
     elif dataset == 'cifar100':
-        (Xtr, ytr), (Xts, yts) = datasets.cifar10.load_data()
+        (Xtr, ytr), (Xts, yts) = datasets.cifar100.load_data()
     else:
         raise Exception('Unknown dataset %s' % dataset)
     if reduced:
@@ -32,7 +29,7 @@ def get_dataset(dataset, reduced):
     yts = utils.to_categorical(yts)
     return (Xtr, ytr), (Xts, yts)
 
-(Xtr, ytr), (Xts, yts) = get_dataset('reduced-cifar10', True)
+(Xtr, ytr), (Xts, yts) = get_dataset('cifar10', True)
 transformations = get_transformations(Xtr)
 
 # Experiment parameters
