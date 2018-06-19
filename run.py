@@ -49,16 +49,22 @@ CHILD_EPOCHS = 120
 CONTROLLER_EPOCHS = 500 # 15000 or 20000
 
 class Operation:
-    def __init__(self, types_softmax, probs_softmax, magnitudes_softmax):
-        # Ekin Dogus says he sampled, and has not used argmax
-        #self.type = types_softmax.argmax()
-        #self.prob = probs_softmax.argmax() / (OP_PROBS-1)
-        #m = magnitudes_softmax.argmax() / (OP_MAGNITUDES-1)
-        self.type = np.random.choice(OP_TYPES, p=types_softmax)
-        t = transformations[self.type]
+    def __init__(self, types_softmax, probs_softmax, magnitudes_softmax, argmax=False):
+        # Ekin Dogus says he sampled the softmaxes, and has not used argmax
+        # We might still want to use argmax=True for the last predictions, to ensure
+        # the best solutions are chosen and make it deterministic.
+        if argmax:
+            self.type = types_softmax.argmax()
+            t = transformations[self.type]
+            self.prob = probs_softmax.argmax() / (OP_PROBS-1)
+            m = magnitudes_softmax.argmax() / (OP_MAGNITUDES-1)
+            self.magnitude = m*(t[2]-t[1]) + t[1]
+        else:
+            self.type = np.random.choice(OP_TYPES, p=types_softmax)
+            t = transformations[self.type]
+            self.prob = np.random.choice(np.linspace(0, 1, OP_PROBS), p=probs_softmax)
+            self.magnitude = np.random.choice(np.linspace(t[1], t[2], OP_MAGNITUDES), p=magnitudes_softmax)
         self.transformation = t[0]
-        self.prob = np.random.choice(np.linspace(0, 1, OP_PROBS), p=probs_softmax)
-        self.magnitude = np.random.choice(np.linspace(t[1], t[2], OP_MAGNITUDES), p=magnitudes_softmax)
 
     def __call__(self, X):
         _X = []
