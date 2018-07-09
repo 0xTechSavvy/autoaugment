@@ -1,6 +1,6 @@
 # AutoAugment
 
-My attempt at reproduction of the following paper from Google. I have used Keras and TensorFlow.
+My attempt at reproducing the following paper from Google. I have used Keras and TensorFlow.
 
 * [AutoAugment: Learning Augmentation Policies from Data](https://arxiv.org/abs/1805.09501). Ekin D. Cubuk, Barret Zoph, Dandelion Mane, Vijay Vasudevan, Quoc V. Le.
 
