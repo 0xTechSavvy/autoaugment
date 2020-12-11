@@ -44,7 +44,8 @@ OP_PROBS = 11
 OP_MAGNITUDES = 10
 
 CHILD_BATCH_SIZE = 128
-CHILD_BATCHES = len(Xtr) // CHILD_BATCH_SIZE
+CHILD_BATCHES = len(Xtr) // CHILD_BATCH_SIZE # '/' means normal divide, and '//' means integeral divide
+
 CHILD_EPOCHS = 120
 CONTROLLER_EPOCHS = 500 # 15000 or 20000
 
@@ -98,11 +99,15 @@ class Subpolicy:
 class Controller:
     def __init__(self):
         self.model = self.create_model()
-        self.scale = tf.placeholder(tf.float32, ())
-        self.grads = tf.gradients(self.model.outputs, self.model.trainable_weights)
+        self.scale = tf.placeholder(tf.float32, ()) #不确定大小的占位符，最后会传入最终的值
+        #print(self.model.outputs) #有一列model，输出结果也是一列
+        #print(self.model.trainable_weights) #不是很懂
+        self.grads = tf.gradients(self.model.outputs #模型输出张量的列表
+                                  , self.model.trainable_weights)#可以训练的变量list
+        #print(self.grads)
         # negative for gradient ascent
         self.grads = [g * (-self.scale) for g in self.grads]
-        self.grads = zip(self.grads, self.model.trainable_weights)
+        self.grads = zip(self.grads, self.model.trainable_weights) #直积
         self.optimizer = tf.train.GradientDescentOptimizer(0.00035).apply_gradients(self.grads)
 
     def create_model(self):
@@ -112,9 +117,11 @@ class Controller:
         # outputs. This is not desirable, since the paper produces 25 subpolicies in the
         # end.
         input_layer = layers.Input(shape=(SUBPOLICIES, 1))
-        init = initializers.RandomUniform(-0.1, 0.1)
+        init = initializers.RandomUniform(-0.1, 0.1)#生成均匀分布的随机数
         lstm_layer = layers.LSTM(
-            LSTM_UNITS, recurrent_initializer=init, return_sequences=True,
+            LSTM_UNITS, #输出维度
+            recurrent_initializer=init, #给偏置进行初始化操作的方法
+            return_sequences=True,#返回全部输出的序列
             name='controller')(input_layer)
         outputs = []
         for i in range(SUBPOLICY_OPS):
@@ -124,24 +131,29 @@ class Controller:
                 layers.Dense(OP_PROBS, activation='softmax', name=name + 'p')(lstm_layer),
                 layers.Dense(OP_MAGNITUDES, activation='softmax', name=name + 'm')(lstm_layer),
             ]
+        #我们看到对每个操作里面建了三个网络，细节具体讨论
         return models.Model(input_layer, outputs)
 
     def fit(self, mem_softmaxes, mem_accuracies):
-        session = backend.get_session()
+        session = backend.get_session() #我们在session里面计算tensor
         min_acc = np.min(mem_accuracies)
         max_acc = np.max(mem_accuracies)
         dummy_input = np.zeros((1, SUBPOLICIES, 1))
         dict_input = {self.model.input: dummy_input}
         # FIXME: the paper does mini-batches (10)
-        for softmaxes, acc in zip(mem_softmaxes, mem_accuracies):
+        for softmaxes, acc in zip(mem_softmaxes, mem_accuracies): # learn this way to programming
             scale = (acc-min_acc) / (max_acc-min_acc)
             dict_outputs = {_output: s for _output, s in zip(self.model.outputs, softmaxes)}
             dict_scales = {self.scale: scale}
-            session.run(self.optimizer, feed_dict={**dict_outputs, **dict_scales, **dict_input})
+            #print(dict_scales)
+            #print("rua")
+            session.run(self.optimizer,#单个图元素
+                        feed_dict={**dict_outputs, **dict_scales, **dict_input}) #将图元素映射到值的字典
         return self
 
     def predict(self, size):
         dummy_input = np.zeros((1, size, 1), np.float32)
+        #没用的输入
         softmaxes = self.model.predict(dummy_input)
         # convert softmaxes into subpolicies
         subpolicies = []
@@ -165,7 +177,7 @@ def autoaugment(subpolicies, X, y):
             _y = y[_ix]
             subpolicy = np.random.choice(subpolicies)
             _X = subpolicy(_X)
-            _X = _X.astype(np.float32) / 255
+            _X = _X.astype(np.float32) / 255 # select from middle and put some subpolicy on that
             yield _X, _y
 
 class Child:
@@ -177,7 +189,7 @@ class Child:
 
     def create_model(self, input_shape):
         x = input_layer = layers.Input(shape=input_shape)
-        x = layers.Conv2D(32, 3, activation='relu')(x)
+        x = layers.Conv2D(32, 3, activation='relu')(x)# take in a tensor and give out another tensor
         x = layers.Conv2D(64, 3, activation='relu')(x)
         x = layers.MaxPooling2D(2)(x)
         x = layers.Dropout(0.25)(x)
@@ -190,7 +202,7 @@ class Child:
     def fit(self, subpolicies, X, y):
         gen = autoaugment(subpolicies, X, y)
         self.model.fit_generator(
-            gen, CHILD_BATCHES, CHILD_EPOCHS, verbose=0, use_multiprocessing=True)
+            gen, CHILD_BATCHES, CHILD_EPOCHS, verbose=1, use_multiprocessing=False)
         return self
 
     def evaluate(self, X, y):
@@ -209,14 +221,13 @@ for epoch in range(CONTROLLER_EPOCHS):
         print('# Sub-policy %d' % (i+1))
         print(subpolicy)
     mem_softmaxes.append(softmaxes)
-
-    child = Child(Xtr.shape[1:])
+    child = Child(Xtr.shape[1:])#(32,32,3)
     tic = time.time()
     child.fit(subpolicies, Xtr, ytr)
     toc = time.time()
     accuracy = child.evaluate(Xts, yts)
     print('-> Child accuracy: %.3f (elaspsed time: %ds)' % (accuracy, (toc-tic)))
-    mem_accuracies.append(accuracy)
+    mem_accuracies.append(accuracy)# accuracy which was put into use
 
     if len(mem_softmaxes) > 5:
         # ricardo: I let some epochs pass, so that the normalization is more robust
